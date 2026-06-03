@@ -50,10 +50,10 @@ export default function Dashboard() {
         externalRes.json(),
         projectsRes.json(),
       ])
-      setOverdueTasks(overdueData)
-      setTodayTasks(todayData)
-      setExternalTasks(externalData)
-      setProjects(projectsData)
+      setOverdueTasks(Array.isArray(overdueData) ? overdueData : [])
+      setTodayTasks(Array.isArray(todayData) ? todayData : [])
+      setExternalTasks(Array.isArray(externalData) ? externalData : [])
+      setProjects(Array.isArray(projectsData) ? projectsData : [])
     } catch (e) {
       console.error('שגיאה בטעינת נתונים', e)
     } finally {
