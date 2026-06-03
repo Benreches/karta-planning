@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0F1117;
+  --bg2: #181C27;
+  --bg3: #1E2235;
+  --border: rgba(255,255,255,0.08);
+  --text: #F0F2FF;
+  --text2: #8B91A8;
+  --text3: #555C75;
+  --accent: #5B6EF5;
+  --accent2: #3ECFAA;
+  --red: #E85C5C;
+  --amber: #F0A843;
+  --green: #3ECFAA;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Heebo', sans-serif;
+  direction: rtl;
+}
