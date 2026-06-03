@@ -27,6 +27,16 @@ const TYPE_LABELS: Record<string, string> = {
   PINUI_BINUI: 'פינוי בינוי',
 }
 
+type NavKey = 'dashboard' | 'projects' | 'tasks' | 'meetings' | 'alerts'
+
+const NAV_ITEMS: { key: NavKey; icon: string; label: string }[] = [
+  { key: 'dashboard', icon: '⌂', label: 'לוח יומי' },
+  { key: 'projects', icon: '◫', label: 'פרויקטים' },
+  { key: 'tasks', icon: '✓', label: 'כל המשימות' },
+  { key: 'meetings', icon: '📅', label: 'פגישות' },
+  { key: 'alerts', icon: '🔔', label: 'התראות' },
+]
+
 export default function Dashboard() {
   const [overdueTasks, setOverdueTasks] = useState<Task[]>([])
   const [todayTasks, setTodayTasks] = useState<Task[]>([])
@@ -34,6 +44,13 @@ export default function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([])
   const [showAddTask, setShowAddTask] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [activeNav, setActiveNav] = useState<NavKey>('dashboard')
+  const [dateStr, setDateStr] = useState('')
+
+  // Set date client-side only to avoid hydration mismatch
+  useEffect(() => {
+    setDateStr(new Date().toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }))
+  }, [])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -78,36 +95,42 @@ export default function Dashboard() {
           onSaved={() => { setShowAddTask(false); loadData() }}
         />
       )}
-      <div className="flex">
+      <div className="flex min-h-screen">
 
         {/* Sidebar */}
-        <div className="w-56 min-h-screen flex flex-col flex-shrink-0" style={{ background: 'var(--bg2)', borderLeft: '1px solid var(--border)' }}>
+        <div className="w-56 flex flex-col flex-shrink-0" style={{ background: 'var(--bg2)', borderLeft: '1px solid var(--border)' }}>
           <div className="p-5 border-b" style={{ borderColor: 'var(--border)' }}>
             <div className="font-bold text-base" style={{ color: 'var(--text)' }}>קרתא נדל"ן</div>
             <div className="text-xs mt-1" style={{ color: 'var(--text3)' }}>מערכת תכנון ורישוי</div>
           </div>
           <nav className="p-3 flex-1">
-            {[
-              { icon: '⌂', label: 'לוח יומי', badge: overdueTasks.length || null, active: true },
-              { icon: '◫', label: 'פרויקטים', badge: null, active: false },
-              { icon: '✓', label: 'כל המשימות', badge: null, active: false },
-              { icon: '📅', label: 'פגישות', badge: null, active: false },
-              { icon: '🔔', label: 'התראות', badge: null, active: false },
-            ].map(item => (
-              <div key={item.label} className="flex items-center gap-2 px-3 py-2 rounded-lg mb-1 cursor-pointer text-sm transition-all"
-                style={{
-                  background: item.active ? 'var(--accent)' : 'transparent',
-                  color: item.active ? '#fff' : 'var(--text2)'
-                }}>
-                <span>{item.icon}</span>
-                <span className="flex-1">{item.label}</span>
-                {item.badge ? (
-                  <span className="text-xs px-1.5 py-0.5 rounded-full text-white" style={{ background: 'var(--red)', fontSize: '10px' }}>
-                    {item.badge}
-                  </span>
-                ) : null}
-              </div>
-            ))}
+            {NAV_ITEMS.map(item => {
+              const isActive = activeNav === item.key
+              const badge = item.key === 'dashboard' ? (overdueTasks.length || null) : null
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setActiveNav(item.key)}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg mb-1 text-sm transition-all text-right"
+                  style={{
+                    background: isActive ? 'var(--accent)' : 'transparent',
+                    color: isActive ? '#fff' : 'var(--text2)',
+                    cursor: 'pointer',
+                    border: 'none',
+                    outline: 'none',
+                  }}
+                >
+                  <span>{item.icon}</span>
+                  <span className="flex-1 text-right">{item.label}</span>
+                  {badge ? (
+                    <span className="text-xs px-1.5 py-0.5 rounded-full text-white" style={{ background: 'var(--red)', fontSize: '10px' }}>
+                      {badge}
+                    </span>
+                  ) : null}
+                </button>
+              )
+            })}
           </nav>
           <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
             <div className="flex items-center gap-2">
@@ -122,21 +145,22 @@ export default function Dashboard() {
         </div>
 
         {/* Main */}
-        <div className="flex-1 overflow-y-auto p-7">
+        <div className="flex-1 p-7" style={{ minWidth: 0 }}>
 
           {/* Header */}
           <div className="flex justify-between items-start mb-6">
             <div>
               <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>בוקר טוב, בנצי</h1>
               <p className="text-sm mt-1" style={{ color: 'var(--text3)' }}>
-                {new Date().toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                {' · '}{projects.length} פרויקטים פעילים
+                {dateStr}{dateStr ? ' · ' : ''}{projects.length} פרויקטים פעילים
               </p>
             </div>
             <button
+              type="button"
               onClick={() => setShowAddTask(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-85"
-              style={{ background: 'var(--accent)' }}>
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
+              style={{ background: 'var(--accent)', cursor: 'pointer', border: 'none', outline: 'none', flexShrink: 0 }}
+            >
               + משימה חדשה
             </button>
           </div>
@@ -144,7 +168,7 @@ export default function Dashboard() {
           {/* Stats */}
           <div className="grid grid-cols-4 gap-3 mb-6">
             {stats.map(stat => (
-              <div key={stat.label} className="rounded-xl p-4 transition-all hover:scale-105"
+              <div key={stat.label} className="rounded-xl p-4"
                 style={{ background: 'var(--bg2)', border: `1px solid var(--border)`, borderTop: `2px solid ${stat.borderColor}` }}>
                 <div className="text-3xl font-bold tracking-tight" style={{ color: stat.color }}>
                   {loading ? '—' : stat.num}
@@ -169,7 +193,7 @@ export default function Dashboard() {
                 ) : overdueTasks.length === 0 ? (
                   <EmptyState text="אין משימות באיחור 🎉" />
                 ) : overdueTasks.map(task => (
-                  <div key={task.id} className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all hover:-translate-x-0.5"
+                  <div key={task.id} className="flex items-center gap-3 px-4 py-3 rounded-xl"
                     style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRight: '3px solid var(--red)' }}>
                     <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg3)', color: 'var(--text3)' }}>{task.project}</span>
                     <span className="flex-1 text-sm" style={{ color: 'var(--text)' }}>{task.name}</span>
@@ -192,7 +216,7 @@ export default function Dashboard() {
                 ) : todayTasks.length === 0 ? (
                   <EmptyState text="אין משימות להיום" />
                 ) : todayTasks.map(task => (
-                  <div key={task.id} className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all hover:-translate-x-0.5"
+                  <div key={task.id} className="flex items-center gap-3 px-4 py-3 rounded-xl"
                     style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRight: '3px solid var(--amber)' }}>
                     <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg3)', color: 'var(--text3)' }}>{task.project}</span>
                     <span className="flex-1 text-sm" style={{ color: 'var(--text)' }}>{task.name}</span>
@@ -215,7 +239,7 @@ export default function Dashboard() {
                 ) : externalTasks.length === 0 ? (
                   <EmptyState text="אין משימות ממתינות לגורם חיצוני" />
                 ) : externalTasks.map(task => (
-                  <div key={task.id} className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer"
+                  <div key={task.id} className="flex items-center gap-3 px-4 py-3 rounded-xl"
                     style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRight: '3px solid var(--text3)' }}>
                     <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg3)', color: 'var(--text3)' }}>{task.project}</span>
                     <span className="flex-1 text-sm" style={{ color: 'var(--text)' }}>{task.name}</span>
@@ -236,7 +260,9 @@ export default function Dashboard() {
           <div>
             <div className="flex justify-between items-center mb-3">
               <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text2)' }}>פרויקטים פעילים</span>
-              <span className="text-xs cursor-pointer" style={{ color: 'var(--accent)' }}>כל הפרויקטים</span>
+              <button type="button" onClick={() => setActiveNav('projects')} className="text-xs" style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                כל הפרויקטים
+              </button>
             </div>
             <div className="grid grid-cols-3 gap-3">
               {loading ? (
@@ -246,8 +272,8 @@ export default function Dashboard() {
               ) : projects.map(proj => {
                 const isTeal = proj.type === 'PINUI_BINUI'
                 return (
-                  <div key={proj.id} className="rounded-xl p-4 cursor-pointer transition-all hover:-translate-y-0.5"
-                    style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                  <div key={proj.id} className="rounded-xl p-4"
+                    style={{ background: 'var(--bg2)', border: '1px solid var(--border)', cursor: 'pointer' }}>
                     <div className="flex justify-between items-start mb-2">
                       <span className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{proj.name}</span>
                       <span className="text-xs px-2 py-0.5 rounded-full"
