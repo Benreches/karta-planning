@@ -1,39 +1,83 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import AddTaskModal from '../components/AddTaskModal'
 
-const mockTasks = {
-  urgent: [
-    { id: 1, project: 'בוכרים', name: 'העברת מסמכים לבנק דיסקונט', assignee: 'רותם', daysLate: 5 },
-    { id: 2, project: 'גילה', name: 'קבלת תשובה ממהנדס העיר', assignee: 'אלישבע', daysLate: 2 },
-    { id: 3, project: 'הפעמון', name: 'שיבוץ לוועדה מחוזית', assignee: 'אני', daysLate: 1 },
-    { id: 4, project: 'שחר 18', name: 'חתימת יפויי כוח — חסרים 3 דיירים', assignee: 'רותם', daysLate: 3 },
-  ],
-  today: [
-    { id: 5, project: 'סן מרטין', name: 'אישור הצעת מחיר אדריכל', assignee: 'אני' },
-    { id: 6, project: 'בן גמלא', name: 'העברת יפויי כוח תכנוניים', assignee: 'רותם' },
-    { id: 7, project: 'נג׳ארה', name: 'אישור סקיצה ראשונה לקונספט', assignee: 'אלישבע' },
-  ],
-  external: [
-    { id: 8, project: 'אגריפס', name: 'תשובה על התנגדויות', party: 'מחוזית', daysWaiting: 18 },
-    { id: 9, project: 'ל"ה', name: 'אישור שימור', party: 'עתיקות', daysWaiting: 11 },
-    { id: 10, project: 'יהודה הנשיא', name: 'חוות דעת תנועה', party: 'יועץ', daysWaiting: 6 },
-  ],
+interface Task {
+  id: string
+  name: string
+  project: string
+  assignee: string
+  dueDate: string
+  status: string
+  externalParty?: string
+  daysLate: number
+  daysWaiting: number
 }
 
-const mockProjects = [
-  { id: 1, name: 'בוכרים', type: 'תב"ע יזמית', phase: 'רשות מקומית — דיון', progress: 45, urgent: 2, typeColor: 'blue' },
-  { id: 2, name: 'גילה', type: 'פינוי בינוי', phase: 'הכרזה + פתיחת תיק', progress: 20, urgent: 1, typeColor: 'teal' },
-  { id: 3, name: 'הפעמון', type: 'תב"ע יזמית', phase: 'מחוזית — התנגדויות', progress: 68, urgent: 1, typeColor: 'blue' },
-  { id: 4, name: 'ל"ה', type: 'תב"ע יזמית', phase: 'רישוי — היתר דיפון', progress: 82, urgent: 0, typeColor: 'amber' },
-  { id: 5, name: 'סן מרטין', type: 'פינוי בינוי', phase: 'פתיחת תיק מחוזית', progress: 30, urgent: 0, typeColor: 'teal' },
-  { id: 6, name: 'בן גמלא', type: 'פינוי בינוי', phase: 'הכרזת מנהלת', progress: 12, urgent: 0, typeColor: 'teal' },
-]
+interface Project {
+  id: string
+  name: string
+  type: string
+  phase: string
+  urgentCount: number
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  TAVA_IZMI: 'תב"ע יזמית',
+  PINUI_BINUI: 'פינוי בינוי',
+}
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'urgent' | 'today' | 'external'>('urgent')
+  const [overdueTasks, setOverdueTasks] = useState<Task[]>([])
+  const [todayTasks, setTodayTasks] = useState<Task[]>([])
+  const [externalTasks, setExternalTasks] = useState<Task[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [showAddTask, setShowAddTask] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [overdueRes, todayRes, externalRes, projectsRes] = await Promise.all([
+        fetch('/api/tasks?filter=overdue'),
+        fetch('/api/tasks?filter=today'),
+        fetch('/api/tasks?filter=external'),
+        fetch('/api/projects'),
+      ])
+      const [overdueData, todayData, externalData, projectsData] = await Promise.all([
+        overdueRes.json(),
+        todayRes.json(),
+        externalRes.json(),
+        projectsRes.json(),
+      ])
+      setOverdueTasks(overdueData)
+      setTodayTasks(todayData)
+      setExternalTasks(externalData)
+      setProjects(projectsData)
+    } catch (e) {
+      console.error('שגיאה בטעינת נתונים', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  const stats = [
+    { num: overdueTasks.length, label: 'משימות באיחור', color: 'var(--red)', borderColor: 'var(--red)' },
+    { num: todayTasks.length, label: 'לטיפול היום', color: 'var(--amber)', borderColor: 'var(--amber)' },
+    { num: externalTasks.length, label: 'ממתין גורם חיצוני', color: 'var(--text2)', borderColor: 'var(--text3)' },
+    { num: projects.length, label: 'פרויקטים פעילים', color: 'var(--accent)', borderColor: 'var(--accent)' },
+  ]
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
+      {showAddTask && (
+        <AddTaskModal
+          onClose={() => setShowAddTask(false)}
+          onSaved={() => { setShowAddTask(false); loadData() }}
+        />
+      )}
       <div className="flex">
 
         {/* Sidebar */}
@@ -44,7 +88,7 @@ export default function Dashboard() {
           </div>
           <nav className="p-3 flex-1">
             {[
-              { icon: '⌂', label: 'לוח יומי', badge: 4, active: true },
+              { icon: '⌂', label: 'לוח יומי', badge: overdueTasks.length || null, active: true },
               { icon: '◫', label: 'פרויקטים', badge: null, active: false },
               { icon: '✓', label: 'כל המשימות', badge: null, active: false },
               { icon: '📅', label: 'פגישות', badge: null, active: false },
@@ -57,11 +101,11 @@ export default function Dashboard() {
                 }}>
                 <span>{item.icon}</span>
                 <span className="flex-1">{item.label}</span>
-                {item.badge && (
+                {item.badge ? (
                   <span className="text-xs px-1.5 py-0.5 rounded-full text-white" style={{ background: 'var(--red)', fontSize: '10px' }}>
                     {item.badge}
                   </span>
-                )}
+                ) : null}
               </div>
             ))}
           </nav>
@@ -85,10 +129,13 @@ export default function Dashboard() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>בוקר טוב, בנצי</h1>
               <p className="text-sm mt-1" style={{ color: 'var(--text3)' }}>
-                {new Date().toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} · 15 פרויקטים פעילים
+                {new Date().toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                {' · '}{projects.length} פרויקטים פעילים
               </p>
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-85"
+            <button
+              onClick={() => setShowAddTask(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-85"
               style={{ background: 'var(--accent)' }}>
               + משימה חדשה
             </button>
@@ -96,16 +143,12 @@ export default function Dashboard() {
 
           {/* Stats */}
           <div className="grid grid-cols-4 gap-3 mb-6">
-            {[
-              { num: 4, label: 'משימות באיחור', color: 'var(--red)', borderColor: 'var(--red)', tab: 'urgent' },
-              { num: 7, label: 'לטיפול היום', color: 'var(--amber)', borderColor: 'var(--amber)', tab: 'today' },
-              { num: 12, label: 'ממתין החלטה שלי', color: 'var(--accent)', borderColor: 'var(--accent)', tab: 'mine' },
-              { num: 9, label: 'ממתין גורם חיצוני', color: 'var(--text2)', borderColor: 'var(--text3)', tab: 'external' },
-            ].map(stat => (
-              <div key={stat.label} className="rounded-xl p-4 cursor-pointer transition-all hover:scale-105"
-                style={{ background: 'var(--bg2)', border: `1px solid var(--border)`, borderTop: `2px solid ${stat.borderColor}` }}
-                onClick={() => setActiveTab(stat.tab as any)}>
-                <div className="text-3xl font-bold tracking-tight" style={{ color: stat.color }}>{stat.num}</div>
+            {stats.map(stat => (
+              <div key={stat.label} className="rounded-xl p-4 transition-all hover:scale-105"
+                style={{ background: 'var(--bg2)', border: `1px solid var(--border)`, borderTop: `2px solid ${stat.borderColor}` }}>
+                <div className="text-3xl font-bold tracking-tight" style={{ color: stat.color }}>
+                  {loading ? '—' : stat.num}
+                </div>
                 <div className="text-xs mt-1" style={{ color: 'var(--text3)' }}>{stat.label}</div>
               </div>
             ))}
@@ -114,14 +157,18 @@ export default function Dashboard() {
           {/* Task Sections */}
           <div className="space-y-5 mb-6">
 
-            {/* Urgent */}
+            {/* Overdue */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text2)' }}>🔴 באיחור — לטיפול מיידי</span>
-                <span className="text-xs cursor-pointer" style={{ color: 'var(--accent)' }}>הכל</span>
+                <span className="text-xs" style={{ color: 'var(--text3)' }}>{overdueTasks.length} משימות</span>
               </div>
               <div className="space-y-1.5">
-                {mockTasks.urgent.map(task => (
+                {loading ? (
+                  <LoadingRows />
+                ) : overdueTasks.length === 0 ? (
+                  <EmptyState text="אין משימות באיחור 🎉" />
+                ) : overdueTasks.map(task => (
                   <div key={task.id} className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all hover:-translate-x-0.5"
                     style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRight: '3px solid var(--red)' }}>
                     <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg3)', color: 'var(--text3)' }}>{task.project}</span>
@@ -137,10 +184,14 @@ export default function Dashboard() {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text2)' }}>🟡 לטיפול היום</span>
-                <span className="text-xs cursor-pointer" style={{ color: 'var(--accent)' }}>הכל</span>
+                <span className="text-xs" style={{ color: 'var(--text3)' }}>{todayTasks.length} משימות</span>
               </div>
               <div className="space-y-1.5">
-                {mockTasks.today.map(task => (
+                {loading ? (
+                  <LoadingRows />
+                ) : todayTasks.length === 0 ? (
+                  <EmptyState text="אין משימות להיום" />
+                ) : todayTasks.map(task => (
                   <div key={task.id} className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all hover:-translate-x-0.5"
                     style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRight: '3px solid var(--amber)' }}>
                     <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg3)', color: 'var(--text3)' }}>{task.project}</span>
@@ -156,15 +207,21 @@ export default function Dashboard() {
             <div>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text2)' }}>⏳ ממתין לגורם חיצוני</span>
-                <span className="text-xs cursor-pointer" style={{ color: 'var(--accent)' }}>הכל</span>
+                <span className="text-xs" style={{ color: 'var(--text3)' }}>{externalTasks.length} משימות</span>
               </div>
               <div className="space-y-1.5">
-                {mockTasks.external.map(task => (
+                {loading ? (
+                  <LoadingRows />
+                ) : externalTasks.length === 0 ? (
+                  <EmptyState text="אין משימות ממתינות לגורם חיצוני" />
+                ) : externalTasks.map(task => (
                   <div key={task.id} className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer"
                     style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRight: '3px solid var(--text3)' }}>
                     <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg3)', color: 'var(--text3)' }}>{task.project}</span>
                     <span className="flex-1 text-sm" style={{ color: 'var(--text)' }}>{task.name}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text3)' }}>{task.party}</span>
+                    {task.externalParty && (
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text3)' }}>{task.externalParty}</span>
+                    )}
                     <span className="text-xs" style={{ color: 'var(--text3)' }}>מזה {task.daysWaiting} יום</span>
                   </div>
                 ))}
@@ -173,7 +230,7 @@ export default function Dashboard() {
           </div>
 
           {/* Divider */}
-          <hr style={{ borderColor: 'var(--border)', marginBottom: '20px' }}/>
+          <hr style={{ borderColor: 'var(--border)', marginBottom: '20px' }} />
 
           {/* Projects */}
           <div>
@@ -182,38 +239,57 @@ export default function Dashboard() {
               <span className="text-xs cursor-pointer" style={{ color: 'var(--accent)' }}>כל הפרויקטים</span>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              {mockProjects.map(proj => (
-                <div key={proj.id} className="rounded-xl p-4 cursor-pointer transition-all hover:-translate-y-0.5 hover:border-white/20"
-                  style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{proj.name}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full"
-                      style={{
-                        background: proj.typeColor === 'teal' ? 'rgba(62,207,170,0.15)' : 'rgba(91,110,245,0.15)',
-                        color: proj.typeColor === 'teal' ? 'var(--accent2)' : 'var(--accent)'
-                      }}>{proj.type}</span>
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="rounded-xl p-4 animate-pulse" style={{ background: 'var(--bg2)', border: '1px solid var(--border)', height: 100 }} />
+                ))
+              ) : projects.map(proj => {
+                const isTeal = proj.type === 'PINUI_BINUI'
+                return (
+                  <div key={proj.id} className="rounded-xl p-4 cursor-pointer transition-all hover:-translate-y-0.5"
+                    style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{proj.name}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full"
+                        style={{
+                          background: isTeal ? 'rgba(62,207,170,0.15)' : 'rgba(91,110,245,0.15)',
+                          color: isTeal ? 'var(--accent2)' : 'var(--accent)'
+                        }}>{TYPE_LABELS[proj.type] ?? proj.type}</span>
+                    </div>
+                    <div className="text-xs mb-3" style={{ color: 'var(--text3)' }}>{proj.phase}</div>
+                    <div className="flex justify-between">
+                      {proj.urgentCount > 0 ? (
+                        <span className="text-xs" style={{ color: 'var(--red)' }}>⚠ {proj.urgentCount} באיחור</span>
+                      ) : (
+                        <span className="text-xs" style={{ color: 'var(--green)' }}>✓ תקין</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs mb-3" style={{ color: 'var(--text3)' }}>{proj.phase}</div>
-                  <div className="h-1 rounded-full mb-2 overflow-hidden" style={{ background: 'var(--bg3)' }}>
-                    <div className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${proj.progress}%`,
-                        background: proj.typeColor === 'teal' ? 'var(--accent2)' : proj.typeColor === 'amber' ? 'var(--amber)' : 'var(--accent)'
-                      }}/>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs" style={{ color: 'var(--text3)' }}>{proj.progress}%</span>
-                    {proj.urgent > 0 && (
-                      <span className="text-xs" style={{ color: 'var(--red)' }}>⚠ {proj.urgent} באיחור</span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
         </div>
       </div>
+    </div>
+  )
+}
+
+function LoadingRows() {
+  return (
+    <>
+      {[1, 2].map(i => (
+        <div key={i} className="h-11 rounded-xl animate-pulse" style={{ background: 'var(--bg2)' }} />
+      ))}
+    </>
+  )
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--text3)' }}>
+      {text}
     </div>
   )
 }
