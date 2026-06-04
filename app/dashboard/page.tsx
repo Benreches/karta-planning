@@ -340,7 +340,7 @@ export default function Dashboard() {
             background: '#FFFFFF',
           }}>
             <img
-              src="/logo.png"
+              src="/publiclogo.png"
               alt="Karta Group"
               style={{ maxHeight: 60, maxWidth: '100%', objectFit: 'contain' }}
             />
