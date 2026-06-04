@@ -1,219 +1,415 @@
 'use client'
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
+import Image from 'next/image'
 
-const mockTasks = {
+type Task = {
+  id: number
+  project: string
+  name: string
+  assignee: string
+  daysLate?: number
+  party?: string
+  daysWaiting?: number
+  dueDate: string
+  done?: boolean
+}
+
+type Section = 'urgent' | 'today' | 'external'
+
+const initialTasks: Record<Section, Task[]> = {
   urgent: [
-    { id: 1, project: 'בוכרים', name: 'העברת מסמכים לבנק דיסקונט', assignee: 'רותם', daysLate: 5 },
-    { id: 2, project: 'גילה', name: 'קבלת תשובה ממהנדס העיר', assignee: 'אלישבע', daysLate: 2 },
-    { id: 3, project: 'הפעמון', name: 'שיבוץ לוועדה מחוזית', assignee: 'אני', daysLate: 1 },
-    { id: 4, project: 'שחר 18', name: 'חתימת יפויי כוח — חסרים 3 דיירים', assignee: 'רותם', daysLate: 3 },
+    { id: 1, project: 'בוכרים', name: 'העברת מסמכים לבנק דיסקונט', assignee: 'רותם', daysLate: 5, dueDate: '29/05/2026' },
+    { id: 2, project: 'גילה', name: 'קבלת תשובה ממהנדס העיר', assignee: 'אלישבע', daysLate: 2, dueDate: '01/06/2026' },
+    { id: 3, project: 'הפעמון', name: 'שיבוץ לוועדה מחוזית', assignee: 'אני', daysLate: 1, dueDate: '02/06/2026' },
+    { id: 4, project: 'שחר 18', name: 'חתימת יפויי כוח — חסרים 3 דיירים', assignee: 'רותם', daysLate: 3, dueDate: '31/05/2026' },
   ],
   today: [
-    { id: 5, project: 'סן מרטין', name: 'אישור הצעת מחיר אדריכל', assignee: 'אני' },
-    { id: 6, project: 'בן גמלא', name: 'העברת יפויי כוח תכנוניים', assignee: 'רותם' },
-    { id: 7, project: 'נג׳ארה', name: 'אישור סקיצה ראשונה לקונספט', assignee: 'אלישבע' },
+    { id: 5, project: 'סן מרטין', name: 'אישור הצעת מחיר אדריכל', assignee: 'אני', dueDate: '04/06/2026' },
+    { id: 6, project: 'בן גמלא', name: 'העברת יפויי כוח תכנוניים', assignee: 'רותם', dueDate: '04/06/2026' },
+    { id: 7, project: 'נג׳ארה', name: 'אישור סקיצה ראשונה לקונספט', assignee: 'אלישבע', dueDate: '04/06/2026' },
   ],
   external: [
-    { id: 8, project: 'אגריפס', name: 'תשובה על התנגדויות', party: 'מחוזית', daysWaiting: 18 },
-    { id: 9, project: 'ל"ה', name: 'אישור שימור', party: 'עתיקות', daysWaiting: 11 },
-    { id: 10, project: 'יהודה הנשיא', name: 'חוות דעת תנועה', party: 'יועץ', daysWaiting: 6 },
+    { id: 8, project: 'אגריפס', name: 'תשובה על התנגדויות', party: 'מחוזית', daysWaiting: 18, assignee: '—', dueDate: '15/05/2026' },
+    { id: 9, project: 'ל"ה', name: 'אישור שימור', party: 'עתיקות', daysWaiting: 11, assignee: '—', dueDate: '22/05/2026' },
+    { id: 10, project: 'יהודה הנשיא', name: 'חוות דעת תנועה', party: 'יועץ', daysWaiting: 6, assignee: '—', dueDate: '28/05/2026' },
   ],
 }
 
 const mockProjects = [
-  { id: 1, name: 'בוכרים', type: 'תב"ע יזמית', phase: 'רשות מקומית — דיון', progress: 45, urgent: 2, typeColor: 'blue' },
-  { id: 2, name: 'גילה', type: 'פינוי בינוי', phase: 'הכרזה + פתיחת תיק', progress: 20, urgent: 1, typeColor: 'teal' },
-  { id: 3, name: 'הפעמון', type: 'תב"ע יזמית', phase: 'מחוזית — התנגדויות', progress: 68, urgent: 1, typeColor: 'blue' },
-  { id: 4, name: 'ל"ה', type: 'תב"ע יזמית', phase: 'רישוי — היתר דיפון', progress: 82, urgent: 0, typeColor: 'amber' },
-  { id: 5, name: 'סן מרטין', type: 'פינוי בינוי', phase: 'פתיחת תיק מחוזית', progress: 30, urgent: 0, typeColor: 'teal' },
-  { id: 6, name: 'בן גמלא', type: 'פינוי בינוי', phase: 'הכרזת מנהלת', progress: 12, urgent: 0, typeColor: 'teal' },
+  { id: 1, name: 'בוכרים', type: 'תב"ע יזמית', phase: 'רשות מקומית — דיון', progress: 45, urgent: 2 },
+  { id: 2, name: 'גילה', type: 'פינוי בינוי', phase: 'הכרזה + פתיחת תיק', progress: 20, urgent: 1 },
+  { id: 3, name: 'הפעמון', type: 'תב"ע יזמית', phase: 'מחוזית — התנגדויות', progress: 68, urgent: 1 },
+  { id: 4, name: 'ל"ה', type: 'תב"ע יזמית', phase: 'רישוי — היתר דיפון', progress: 82, urgent: 0 },
+  { id: 5, name: 'סן מרטין', type: 'פינוי בינוי', phase: 'פתיחת תיק מחוזית', progress: 30, urgent: 0 },
+  { id: 6, name: 'בן גמלא', type: 'פינוי בינוי', phase: 'הכרזת מנהלת', progress: 12, urgent: 0 },
+]
+
+const SECTIONS: { key: Section; label: string; headerBg: string; borderColor: string; badgeColor: string }[] = [
+  { key: 'urgent',   label: '⚠ באיחור — לטיפול מיידי', headerBg: '#991B1B', borderColor: '#EF4444', badgeColor: '#EF4444' },
+  { key: 'today',    label: '📋 לטיפול היום',            headerBg: '#92400E', borderColor: '#F97316', badgeColor: '#F97316' },
+  { key: 'external', label: '⏳ ממתין לגורם חיצוני',    headerBg: '#374151', borderColor: '#9CA3AF', badgeColor: '#6B7280' },
+]
+
+const navItems = [
+  { id: 'dashboard', label: 'לוח יומי',    icon: '🗓' },
+  { id: 'projects',  label: 'פרויקטים',    icon: '📁' },
+  { id: 'tasks',     label: 'כל המשימות',  icon: '📋' },
+  { id: 'meetings',  label: 'פגישות',       icon: '👥' },
+  { id: 'alerts',    label: 'התראות',       icon: '🔔' },
 ]
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'urgent' | 'today' | 'external'>('urgent')
+  const [tasks, setTasks] = useState(initialTasks)
+  const [completing, setCompleting] = useState<Set<number>>(new Set())
+  const [activeNav, setActiveNav] = useState('dashboard')
+
+  const markDone = useCallback(async (section: Section, taskId: number) => {
+    if (completing.has(taskId)) return
+    setCompleting(prev => new Set(prev).add(taskId))
+
+    // Optimistic update
+    setTasks(prev => ({
+      ...prev,
+      [section]: prev[section].map(t => t.id === taskId ? { ...t, done: true } : t),
+    }))
+
+    try {
+      await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ done: true }),
+      })
+    } catch {
+      // API not yet connected — optimistic update stands
+    } finally {
+      setCompleting(prev => { const n = new Set(prev); n.delete(taskId); return n })
+    }
+  }, [completing])
+
+  const sortedTasks = (section: Section) => {
+    const list = tasks[section]
+    return [...list.filter(t => !t.done), ...list.filter(t => t.done)]
+  }
+
+  const urgentCount  = tasks.urgent.filter(t => !t.done).length
+  const todayCount   = tasks.today.filter(t => !t.done).length
+  const waitingCount = tasks.external.filter(t => !t.done).length
+  const totalActive  = urgentCount + todayCount + waitingCount
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
-      <div className="flex">
+    <div dir="rtl" style={{ minHeight: '100vh', background: '#F3F4F6', fontFamily: 'Heebo, Segoe UI, Arial, sans-serif', display: 'flex' }}>
 
-        {/* Sidebar */}
-        <div className="w-56 min-h-screen flex flex-col flex-shrink-0" style={{ background: 'var(--bg2)', borderLeft: '1px solid var(--border)' }}>
-          <div className="p-5 border-b" style={{ borderColor: 'var(--border)' }}>
-            <div className="font-bold text-base" style={{ color: 'var(--text)' }}>קרתא נדל"ן</div>
-            <div className="text-xs mt-1" style={{ color: 'var(--text3)' }}>מערכת תכנון ורישוי</div>
-          </div>
-          <nav className="p-3 flex-1">
-            {[
-              { icon: '⌂', label: 'לוח יומי', badge: 4, active: true },
-              { icon: '◫', label: 'פרויקטים', badge: null, active: false },
-              { icon: '✓', label: 'כל המשימות', badge: null, active: false },
-              { icon: '📅', label: 'פגישות', badge: null, active: false },
-              { icon: '🔔', label: 'התראות', badge: null, active: false },
-            ].map(item => (
-              <div key={item.label} className="flex items-center gap-2 px-3 py-2 rounded-lg mb-1 cursor-pointer text-sm transition-all"
+      {/* Sidebar */}
+      <aside style={{
+        width: 220,
+        minHeight: '100vh',
+        background: '#fff',
+        borderLeft: '1px solid #E5E7EB',
+        display: 'flex',
+        flexDirection: 'column',
+        flexShrink: 0,
+      }}>
+        {/* Logo */}
+        <div style={{
+          padding: '16px 12px 12px',
+          borderBottom: '1px solid #E5E7EB',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#fff',
+        }}>
+          <Image
+            src="/publiclogo.png"
+            alt="Karta Group"
+            width={160}
+            height={50}
+            style={{ objectFit: 'contain', maxHeight: 50 }}
+            priority
+          />
+        </div>
+
+        {/* Nav */}
+        <nav style={{ padding: '8px 0', flex: 1 }}>
+          {navItems.map(item => {
+            const badge = item.id === 'dashboard' ? totalActive : item.id === 'alerts' ? urgentCount : 0
+            const isActive = activeNav === item.id
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveNav(item.id)}
                 style={{
-                  background: item.active ? 'var(--accent)' : 'transparent',
-                  color: item.active ? '#fff' : 'var(--text2)'
-                }}>
-                <span>{item.icon}</span>
-                <span className="flex-1">{item.label}</span>
-                {item.badge && (
-                  <span className="text-xs px-1.5 py-0.5 rounded-full text-white" style={{ background: 'var(--red)', fontSize: '10px' }}>
-                    {item.badge}
-                  </span>
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '9px 16px',
+                  background: isActive ? '#EFF6FF' : 'transparent',
+                  borderRight: isActive ? '3px solid #2563EB' : '3px solid transparent',
+                  border: 'none',
+                  borderRight: isActive ? '3px solid #2563EB' : '3px solid transparent',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  color: isActive ? '#1D4ED8' : '#374151',
+                  fontWeight: isActive ? 600 : 400,
+                  textAlign: 'right',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = '#F9FAFB' }}
+                onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
+                <span style={{ fontSize: 16 }}>{item.icon}</span>
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {badge > 0 && (
+                  <span style={{
+                    background: '#EF4444', color: '#fff',
+                    borderRadius: 10, padding: '1px 6px', fontSize: 11, fontWeight: 700,
+                  }}>{badge}</span>
                 )}
-              </div>
-            ))}
-          </nav>
-          <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold text-white flex-shrink-0"
-                style={{ background: 'var(--accent)' }}>ב</div>
-              <div>
-                <div className="text-xs font-medium" style={{ color: 'var(--text)' }}>בנצי</div>
-                <div className="text-xs" style={{ color: 'var(--text3)' }}>מנהל תכנון ורישוי</div>
-              </div>
-            </div>
+              </button>
+            )
+          })}
+
+          <div style={{ margin: '12px 16px', borderTop: '1px solid #E5E7EB' }} />
+          <div style={{ padding: '4px 16px 6px', fontSize: 11, color: '#9CA3AF', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
+            פרויקטים
           </div>
-        </div>
-
-        {/* Main */}
-        <div className="flex-1 overflow-y-auto p-7">
-
-          {/* Header */}
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>בוקר טוב, בנצי</h1>
-              <p className="text-sm mt-1" style={{ color: 'var(--text3)' }}>
-                {new Date().toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} · 15 פרויקטים פעילים
-              </p>
-            </div>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-85"
-              style={{ background: 'var(--accent)' }}>
-              + משימה חדשה
+          {mockProjects.map(p => (
+            <button key={p.id} style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 16px 6px 12px', background: 'transparent',
+              border: 'none', cursor: 'pointer', fontSize: 12, color: '#374151', textAlign: 'right',
+            }}
+            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = '#F9FAFB'}
+            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = 'transparent'}>
+              <span style={{ fontSize: 14 }}>📁</span>
+              <span style={{ flex: 1 }}>{p.name}</span>
+              {p.urgent > 0 && (
+                <span style={{ fontSize: 10, color: '#EF4444', fontWeight: 700 }}>⚠{p.urgent}</span>
+              )}
             </button>
-          </div>
+          ))}
+        </nav>
 
-          {/* Stats */}
-          <div className="grid grid-cols-4 gap-3 mb-6">
-            {[
-              { num: 4, label: 'משימות באיחור', color: 'var(--red)', borderColor: 'var(--red)', tab: 'urgent' },
-              { num: 7, label: 'לטיפול היום', color: 'var(--amber)', borderColor: 'var(--amber)', tab: 'today' },
-              { num: 12, label: 'ממתין החלטה שלי', color: 'var(--accent)', borderColor: 'var(--accent)', tab: 'mine' },
-              { num: 9, label: 'ממתין גורם חיצוני', color: 'var(--text2)', borderColor: 'var(--text3)', tab: 'external' },
-            ].map(stat => (
-              <div key={stat.label} className="rounded-xl p-4 cursor-pointer transition-all hover:scale-105"
-                style={{ background: 'var(--bg2)', border: `1px solid var(--border)`, borderTop: `2px solid ${stat.borderColor}` }}
-                onClick={() => setActiveTab(stat.tab as any)}>
-                <div className="text-3xl font-bold tracking-tight" style={{ color: stat.color }}>{stat.num}</div>
-                <div className="text-xs mt-1" style={{ color: 'var(--text3)' }}>{stat.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Task Sections */}
-          <div className="space-y-5 mb-6">
-
-            {/* Urgent */}
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text2)' }}>🔴 באיחור — לטיפול מיידי</span>
-                <span className="text-xs cursor-pointer" style={{ color: 'var(--accent)' }}>הכל</span>
-              </div>
-              <div className="space-y-1.5">
-                {mockTasks.urgent.map(task => (
-                  <div key={task.id} className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all hover:-translate-x-0.5"
-                    style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRight: '3px solid var(--red)' }}>
-                    <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg3)', color: 'var(--text3)' }}>{task.project}</span>
-                    <span className="flex-1 text-sm" style={{ color: 'var(--text)' }}>{task.name}</span>
-                    <span className="text-xs" style={{ color: 'var(--text3)' }}>{task.assignee}</span>
-                    <span className="text-xs" style={{ color: 'var(--red)' }}>לפני {task.daysLate} ימים</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Today */}
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text2)' }}>🟡 לטיפול היום</span>
-                <span className="text-xs cursor-pointer" style={{ color: 'var(--accent)' }}>הכל</span>
-              </div>
-              <div className="space-y-1.5">
-                {mockTasks.today.map(task => (
-                  <div key={task.id} className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all hover:-translate-x-0.5"
-                    style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRight: '3px solid var(--amber)' }}>
-                    <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg3)', color: 'var(--text3)' }}>{task.project}</span>
-                    <span className="flex-1 text-sm" style={{ color: 'var(--text)' }}>{task.name}</span>
-                    <span className="text-xs" style={{ color: 'var(--text3)' }}>{task.assignee}</span>
-                    <span className="text-xs" style={{ color: 'var(--amber)' }}>היום</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* External */}
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text2)' }}>⏳ ממתין לגורם חיצוני</span>
-                <span className="text-xs cursor-pointer" style={{ color: 'var(--accent)' }}>הכל</span>
-              </div>
-              <div className="space-y-1.5">
-                {mockTasks.external.map(task => (
-                  <div key={task.id} className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer"
-                    style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRight: '3px solid var(--text3)' }}>
-                    <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg3)', color: 'var(--text3)' }}>{task.project}</span>
-                    <span className="flex-1 text-sm" style={{ color: 'var(--text)' }}>{task.name}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text3)' }}>{task.party}</span>
-                    <span className="text-xs" style={{ color: 'var(--text3)' }}>מזה {task.daysWaiting} יום</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <hr style={{ borderColor: 'var(--border)', marginBottom: '20px' }}/>
-
-          {/* Projects */}
+        {/* User */}
+        <div style={{ padding: '12px 16px', borderTop: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: '50%', background: '#2563EB',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontWeight: 700, fontSize: 14, flexShrink: 0,
+          }}>ב</div>
           <div>
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text2)' }}>פרויקטים פעילים</span>
-              <span className="text-xs cursor-pointer" style={{ color: 'var(--accent)' }}>כל הפרויקטים</span>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {mockProjects.map(proj => (
-                <div key={proj.id} className="rounded-xl p-4 cursor-pointer transition-all hover:-translate-y-0.5 hover:border-white/20"
-                  style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{proj.name}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full"
-                      style={{
-                        background: proj.typeColor === 'teal' ? 'rgba(62,207,170,0.15)' : 'rgba(91,110,245,0.15)',
-                        color: proj.typeColor === 'teal' ? 'var(--accent2)' : 'var(--accent)'
-                      }}>{proj.type}</span>
-                  </div>
-                  <div className="text-xs mb-3" style={{ color: 'var(--text3)' }}>{proj.phase}</div>
-                  <div className="h-1 rounded-full mb-2 overflow-hidden" style={{ background: 'var(--bg3)' }}>
-                    <div className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${proj.progress}%`,
-                        background: proj.typeColor === 'teal' ? 'var(--accent2)' : proj.typeColor === 'amber' ? 'var(--amber)' : 'var(--accent)'
-                      }}/>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs" style={{ color: 'var(--text3)' }}>{proj.progress}%</span>
-                    {proj.urgent > 0 && (
-                      <span className="text-xs" style={{ color: 'var(--red)' }}>⚠ {proj.urgent} באיחור</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>בנצי</div>
+            <div style={{ fontSize: 11, color: '#6B7280' }}>מנהל תכנון ורישוי</div>
           </div>
-
         </div>
-      </div>
+      </aside>
+
+      {/* Main */}
+      <main style={{ flex: 1, overflowY: 'auto', padding: '28px 32px 60px' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+          <div>
+            <h1 style={{ fontSize: 24, fontWeight: 700, color: '#111827', margin: 0 }}>בוקר טוב, בנצי</h1>
+            <p style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>
+              {new Date().toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              {' · '}{totalActive} משימות פעילות
+            </p>
+          </div>
+          <button style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '10px 20px', borderRadius: 8,
+            background: '#2563EB', color: '#fff', border: 'none',
+            fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(37,99,235,0.35)',
+            transition: 'opacity 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.opacity = '0.88'}
+          onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.opacity = '1'}>
+            <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> משימה חדשה
+          </button>
+        </div>
+
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 28 }}>
+          {[
+            { num: urgentCount,  label: 'משימות באיחור',       color: '#EF4444', bg: '#FEF2F2', border: '#FECACA' },
+            { num: todayCount,   label: 'לטיפול היום',          color: '#F97316', bg: '#FFF7ED', border: '#FED7AA' },
+            { num: waitingCount, label: 'ממתין גורם חיצוני',   color: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB' },
+          ].map(s => (
+            <div key={s.label} style={{
+              background: s.bg, border: `1px solid ${s.border}`,
+              borderRadius: 10, padding: '14px 18px',
+            }}>
+              <div style={{ fontSize: 30, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.num}</div>
+              <div style={{ fontSize: 12, color: '#6B7280', marginTop: 4 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Task Sections */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {SECTIONS.map(sec => {
+            const list = sortedTasks(sec.key)
+            const activeCount = list.filter(t => !t.done).length
+            return (
+              <section key={sec.key}>
+                {/* Category header */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: sec.headerBg, borderRadius: 8,
+                  padding: '8px 16px', marginBottom: 8,
+                }}>
+                  <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>{sec.label}</span>
+                  <span style={{
+                    background: 'rgba(255,255,255,0.2)', color: '#fff',
+                    borderRadius: 10, padding: '1px 8px', fontSize: 11,
+                  }}>
+                    {activeCount} משימות
+                  </span>
+                </div>
+
+                {/* Task cards */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {list.map(task => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      section={sec}
+                      onDone={() => markDone(sec.key, task.id)}
+                      completing={completing.has(task.id)}
+                    />
+                  ))}
+                </div>
+              </section>
+            )
+          })}
+        </div>
+
+      </main>
+    </div>
+  )
+}
+
+/* ── Task Card ── */
+function TaskCard({
+  task, section, onDone, completing,
+}: {
+  task: Task
+  section: typeof SECTIONS[0]
+  onDone: () => void
+  completing: boolean
+}) {
+  const [hover, setHover] = useState(false)
+
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        background: task.done ? '#F9FAFB' : hover ? '#EFF6FF' : '#fff',
+        border: `1px solid ${task.done ? '#E5E7EB' : hover ? '#93C5FD' : '#E5E7EB'}`,
+        borderRadius: 8,
+        padding: '10px 14px',
+        boxShadow: task.done ? 'none' : hover ? '0 2px 8px rgba(37,99,235,0.1)' : '0 1px 3px rgba(0,0,0,0.07)',
+        transition: 'all 0.15s',
+        opacity: task.done ? 0.6 : 1,
+      }}>
+
+      {/* Done button — left side */}
+      <button
+        onClick={onDone}
+        disabled={task.done || completing}
+        title={task.done ? 'בוצע' : 'סמן כבוצע'}
+        style={{
+          flexShrink: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '4px 10px',
+          borderRadius: 6,
+          border: task.done ? '1px solid #A7F3D0' : '1px solid #16A34A',
+          background: task.done ? '#D1FAE5' : completing ? '#DCFCE7' : '#fff',
+          color: task.done ? '#15803D' : '#16A34A',
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: task.done || completing ? 'default' : 'pointer',
+          fontFamily: 'inherit',
+          transition: 'all 0.1s',
+          boxShadow: task.done ? 'none' : '0 1px 2px rgba(0,0,0,0.08)',
+          whiteSpace: 'nowrap',
+        }}
+        onMouseEnter={e => {
+          if (!task.done && !completing)
+            (e.currentTarget as HTMLButtonElement).style.background = '#DCFCE7'
+        }}
+        onMouseLeave={e => {
+          if (!task.done && !completing)
+            (e.currentTarget as HTMLButtonElement).style.background = '#fff'
+        }}
+        onMouseDown={e => {
+          if (!task.done && !completing)
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = 'inset 0 1px 2px rgba(0,0,0,0.15)'
+        }}
+        onMouseUp={e => {
+          (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 1px 2px rgba(0,0,0,0.08)'
+        }}>
+        {completing ? '⌛' : '✓'} {task.done ? 'בוצע' : 'בוצע'}
+      </button>
+
+      {/* Project badge */}
+      <span style={{
+        flexShrink: 0,
+        fontSize: 11,
+        padding: '2px 8px',
+        borderRadius: 4,
+        background: '#F3F4F6',
+        color: '#374151',
+        border: '1px solid #E5E7EB',
+      }}>
+        {task.project}
+      </span>
+
+      {/* Name */}
+      <span style={{
+        flex: 1,
+        fontSize: 13,
+        color: task.done ? '#9CA3AF' : '#111827',
+        textDecoration: task.done ? 'line-through' : 'none',
+      }}>
+        {task.name}
+      </span>
+
+      {/* Assignee */}
+      <span style={{ fontSize: 12, color: '#6B7280', flexShrink: 0 }}>{task.assignee}</span>
+
+      {/* Status badge */}
+      {!task.done && (
+        task.daysLate ? (
+          <span style={{
+            fontSize: 11, padding: '2px 8px', borderRadius: 4, flexShrink: 0,
+            background: '#FEF2F2', color: '#EF4444', border: '1px solid #FECACA', fontWeight: 600,
+          }}>
+            איחור {task.daysLate} ימים
+          </span>
+        ) : task.daysWaiting ? (
+          <span style={{
+            fontSize: 11, padding: '2px 8px', borderRadius: 4, flexShrink: 0,
+            background: '#F9FAFB', color: '#6B7280', border: '1px solid #E5E7EB',
+          }}>
+            {task.party} · מזה {task.daysWaiting} יום
+          </span>
+        ) : (
+          <span style={{
+            fontSize: 11, padding: '2px 8px', borderRadius: 4, flexShrink: 0,
+            background: '#FFF7ED', color: '#F97316', border: '1px solid #FED7AA', fontWeight: 600,
+          }}>
+            היום
+          </span>
+        )
+      )}
     </div>
   )
 }
