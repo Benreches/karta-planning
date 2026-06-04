@@ -255,7 +255,7 @@ export default function Dashboard() {
       }}>
         <span style={{ fontSize: 14, color: '#fff', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.5))' }}>📁</span>
         <span style={{ color: '#fff', fontWeight: 600, fontSize: 13, letterSpacing: 0.3 }}>
-          לוח יומי — קרתא נדל"ן
+          לוח יומי
         </span>
         <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginRight: 4 }}>
           {new Date().toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -325,11 +325,26 @@ export default function Dashboard() {
         {/* Left Panel (Navigation Tree) */}
         <div style={{
           width: 200,
-          background: '#F8F8F8',
+          background: '#FFFFFF',
           borderLeft: '1px solid #bbb',
           overflowY: 'auto',
           flexShrink: 0,
         }}>
+          {/* Logo */}
+          <div style={{
+            padding: '12px 10px 8px',
+            borderBottom: '1px solid #ddd',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            background: '#FFFFFF',
+          }}>
+            <img
+              src="/logo.png"
+              alt="Karta Group"
+              style={{ maxHeight: 60, maxWidth: '100%', objectFit: 'contain' }}
+            />
+          </div>
           {/* Nav header */}
           <div style={{
             background: 'linear-gradient(to bottom, #A6C8E8, #7BAFD4)',
@@ -523,7 +538,7 @@ export default function Dashboard() {
             ? `נבחר: ${[...Object.values(tasks)].flat().find(t => t.id === selected)?.name ?? ''}`
             : `${allTaskCount} פריטים`}
         </span>
-        <span style={{ marginRight: 'auto', color: '#666' }}>קרתא נדל"ן · מערכת תכנון ורישוי</span>
+        <span style={{ marginRight: 'auto', color: '#666' }}>מערכת תכנון ורישוי</span>
         <span>בנצי רצ'ס</span>
         <div style={{
           width: 16, height: 16, background: '#1E88E5', borderRadius: '50%',
